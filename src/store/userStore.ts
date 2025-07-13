@@ -85,12 +85,9 @@ export const useUserStore = create<UserState>((set, get) => ({
             .eq('id', authUser.id)
             .single();
           
-          if (profileError && profileError.code !== 'PGRST116') {
+          if (profileError) {
             console.warn('Profile fetch error:', profileError);
           }
-          
-          // If profile doesn't exist, we don't need to create it here
-          // The database trigger should handle this automatically
           
           // Create user object
           const userData: User = {

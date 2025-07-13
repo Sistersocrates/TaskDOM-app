@@ -153,57 +153,22 @@ const AuthModal: React.FC<AuthModalProps> = ({
     setAttemptedCredentials(null);
   };
 
-  // Listen for auth state changes
+  // Listen for auth state changes to handle successful sign-in
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        console.log('User signed in:', session.user.id);
-        setError(null);
-        setAttemptedCredentials(null);
-        
-        try {
-          // Check if user profile exists, create if it doesn't
-          const { data: profile, error: profileError } = await supabase
-            .from('user_profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-
-          if (profileError && profileError.code === 'PGRST116') {
-            // Profile doesn't exist, create it
-            const { error: createError } = await supabase
-              .from('user_profiles')
-              .insert({
-                id: session.user.id,
-                username: session.user.email?.split('@')[0] || null,
-                display_name: session.user.user_metadata?.full_name || firstName || session.user.email?.split('@')[0] || null,
-                profile_picture: session.user.user_metadata?.avatar_url || 'https://images.pexels.com/photos/733872/pexels-photo-733872.jpeg',
-              });
-
-            if (createError) {
-              console.error('Error creating user profile:', createError);
-            }
-          }
-
-          initialize(); // Initialize user data after sign-in
-          onSuccess?.();
-          onClose();
-        } catch (err) {
-          console.error('Error handling sign-in:', err);
-          initialize(); // Still initialize even if profile creation fails
-          onSuccess?.();
-          onClose();
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setError(null);
-        setAttemptedCredentials(null);
-      } else if (event === 'USER_UPDATED') {
-        console.log('User updated');
+        console.log('AuthModal: User signed in, initializing and closing modal.');
+        // The main App component will handle profile checking and creation
+        await initialize();
+        onSuccess?.();
+        onClose();
       }
     });
 
-    return () => subscription.unsubscribe();
-  }, [onSuccess, onClose, initialize, firstName]);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [initialize, onSuccess, onClose]);
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
