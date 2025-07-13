@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
-import { View, Button, ActivityIndicator, Alert, TextInput } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { supabase } from '../lib/supabase';
+import React, { useState, useEffect } from 'react';
+import { View, ActivityIndicator } from 'react-native';
+import { supabase } from '../../lib/supabase';
+import { useUserStore } from '../../store/userStore';
+import AppNavigator from '../AppNavigator';
 
 export default function Auth() {
   const [session, setSession] = useState<any>(null);
@@ -34,6 +35,6 @@ export default function Auth() {
         </View>
       );
     }
-    return <AppNavigator user={user} />;
+    return <AppNavigator />;
   }
 }

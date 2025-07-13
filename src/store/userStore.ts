@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { User, UserRole, UserSettings } from '../types';
+import { User, UserSettings } from '../types';
 import { supabase, getCurrentUser, getSession } from '../lib/supabase';
 
 interface UserState {

@@ -154,21 +154,23 @@ const AuthModal: React.FC<AuthModalProps> = ({
   };
 
   // Listen for auth state changes to handle successful sign-in
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session) {
-        console.log('AuthModal: User signed in, initializing and closing modal.');
-        // The main App component will handle profile checking and creation
-        await initialize();
-        onSuccess?.();
-        onClose();
-      }
-    });
+  if (isOpen) {
+    useEffect(() => {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+        if (event === 'SIGNED_IN' && session) {
+          console.log('AuthModal: User signed in, initializing and closing modal.');
+          // The main App component will handle profile checking and creation
+          await initialize();
+          onSuccess?.();
+          onClose();
+        }
+      });
 
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [initialize, onSuccess, onClose]);
+      return () => {
+        subscription.unsubscribe();
+      };
+    }, [initialize, onSuccess, onClose]);
+  }
 
   return (
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">

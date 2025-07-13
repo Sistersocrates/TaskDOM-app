@@ -205,7 +205,3 @@ export const getAvailableSurprises = (
     return meetsStreak && meetsPoints && meetsTheme;
   });
 };
-
-const getSurprisesByRarity = (rarity: 'common' | 'rare' | 'epic' | 'legendary'): SpicySurprise[] => {
-  return spicySurprises.filter(surprise => surprise.rarity === rarity);
-};

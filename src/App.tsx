@@ -27,7 +27,7 @@ import { useSocialShare } from './hooks/useSocialShare';
 import { supabase } from './lib/supabase';
 
 function App() {
-  const { initialize, isAuthenticated, isLoading } = useUserStore();
+  const { initialize, isAuthenticated } = useUserStore();
   const { isShareModalOpen, shareContent, closeShareModal } = useSocialShare();
 
   useEffect(() => {

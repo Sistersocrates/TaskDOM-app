@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import { Book } from '../types';
 import { mockBooks } from '../utils/mockData';
@@ -9,8 +9,7 @@ import QuickShareButtons from '../components/QuickShareButtons';
 import Input from '../components/ui/Input';
 import Button from '../components/ui/Button';
 import { useSocialShare } from '../hooks/useSocialShare';
-import { googleBooksService } from '../services/googleBooksService';
-import { openLibraryService } from '../services/openLibraryService';
+import { useBookCovers } from '../hooks/useBookCovers';
 
 type BookStatus = 'all' | 'currentlyReading' | 'wantToRead' | 'finished' | 'dnf';
 type SortOption = 'title' | 'author' | 'spiceRating' | 'progress' | 'dateAdded';
@@ -19,90 +18,11 @@ const LibraryPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<BookStatus>('all');
   const [sortBy, setSortBy] = useState<SortOption>('title');
-  const [books, setBooks] = useState<Book[]>(mockBooks);
+  const [localBooks, setLocalBooks] = useState<Book[]>(mockBooks);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   
+  const { books, isLoading } = useBookCovers(localBooks);
   const { shareReadingList, shareTBR } = useSocialShare();
-  
-  // Enhance book covers on component mount
-  useEffect(() => {
-    const enhanceBookCovers = async () => {
-      setIsLoading(true);
-      
-      try {
-        const enhancedBooks = await Promise.all(
-          books.map(async (book) => {
-            try {
-              // Try to get enhanced cover from Google Books
-              let enhancedCover = null;
-              
-              // Try by ISBN first
-              if (book.isbn) {
-                console.log(`Fetching cover for ISBN: ${book.isbn}`);
-                const googleBook = await googleBooksService.getBookByISBN(book.isbn);
-                if (googleBook?.imageLinks) {
-                  // Prefer larger images for better quality
-                  enhancedCover = googleBook.imageLinks.large || 
-                                googleBook.imageLinks.medium || 
-                                googleBook.imageLinks.small || 
-                                googleBook.imageLinks.thumbnail;
-                  console.log(`Found Google Books cover for ${book.title} by ISBN`);
-                }
-              }
-              
-              // If no cover from ISBN, try searching by title and author
-              if (!enhancedCover && book.title) {
-                console.log(`Searching for cover by title/author: ${book.title} ${book.author}`);
-                const searchResults = await googleBooksService.searchBooks(`${book.title} ${book.author}`, 1);
-                if (searchResults.length > 0 && searchResults[0].imageLinks) {
-                  const imageLinks = searchResults[0].imageLinks;
-                  enhancedCover = imageLinks.large || 
-                                imageLinks.medium || 
-                                imageLinks.small || 
-                                imageLinks.thumbnail;
-                  console.log(`Found Google Books cover for ${book.title} by title/author search`);
-                }
-              }
-              
-              // If still no cover, try Open Library
-              if (!enhancedCover) {
-                console.log(`Trying Open Library for ${book.title}`);
-                enhancedCover = await openLibraryService.getBestCoverImage(
-                  book.isbn, 
-                  book.title, 
-                  book.author
-                );
-                if (enhancedCover) {
-                  console.log(`Found Open Library cover for ${book.title}`);
-                }
-              }
-              
-              // Return book with enhanced cover if found
-              if (enhancedCover) {
-                console.log(`Enhanced cover found for ${book.title}`);
-                return { ...book, coverImage: enhancedCover };
-              }
-              
-              // Return original book if no enhanced cover found
-              return book;
-            } catch (error) {
-              console.error(`Error enhancing cover for ${book.title}:`, error);
-              return book;
-            }
-          })
-        );
-        
-        setBooks(enhancedBooks);
-      } catch (error) {
-        console.error('Error enhancing book covers:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    enhanceBookCovers();
-  }, []);
   
   // Filter books based on search query and status
   const filteredBooks = books.filter(book => {

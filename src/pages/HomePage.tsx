@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import MainLayout from '../components/layout/MainLayout';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import BookCard from '../components/BookCard';
@@ -16,87 +16,21 @@ import { useVoicePraiseStore } from '../store/voicePraiseStore';
 import { useSocialShare } from '../hooks/useSocialShare';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { googleBooksService } from '../services/googleBooksService';
-import { openLibraryService } from '../services/openLibraryService';
+import { useBookCovers } from '../hooks/useBookCovers';
 import { useUserStore } from '../store/userStore';
 
 const HomePage: React.FC = () => {
   const [tasks, setTasks] = useState<Task[]>(mockTasks);
   const [newTaskTitle, setNewTaskTitle] = useState<string>('');
   const [minutesRead, setMinutesRead] = useState<number>(25);
-  const [books, setBooks] = useState(mockBooks);
-  const [isLoadingBooks, setIsLoadingBooks] = useState(false);
   
+  const { books, isLoading: isLoadingBooks } = useBookCovers(mockBooks);
   const playPraise = useVoicePraiseStore(state => state.playPraise);
   const { shareProgress, shareStreak, shareReadingList } = useSocialShare();
   const { user } = useUserStore();
   
   // Filtered books - currently reading
   const currentlyReading = books.filter(book => book.status === 'currentlyReading');
-  
-  // Fetch enhanced book covers on component mount
-  useEffect(() => {
-    const enhanceBookCovers = async () => {
-      setIsLoadingBooks(true);
-      
-      const enhancedBooks = await Promise.all(
-        books.map(async (book) => {
-          try {
-            // Try to get enhanced cover from Google Books
-            let enhancedCover = null;
-            
-            // Try by ISBN first
-            if (book.isbn) {
-              const googleBook = await googleBooksService.getBookByISBN(book.isbn);
-              if (googleBook?.imageLinks) {
-                enhancedCover = googleBook.imageLinks.large || 
-                               googleBook.imageLinks.medium || 
-                               googleBook.imageLinks.small || 
-                               googleBook.imageLinks.thumbnail;
-              }
-            }
-            
-            // If no cover from ISBN, try searching by title and author
-            if (!enhancedCover) {
-              const searchResults = await googleBooksService.searchBooks(`${book.title} ${book.author}`, 1);
-              if (searchResults.length > 0 && searchResults[0].imageLinks) {
-                const imageLinks = searchResults[0].imageLinks;
-                enhancedCover = imageLinks.large || 
-                               imageLinks.medium || 
-                               imageLinks.small || 
-                               imageLinks.thumbnail;
-              }
-            }
-            
-            // If still no cover, try Open Library
-            if (!enhancedCover) {
-              enhancedCover = await openLibraryService.getBestCoverImage(
-                book.isbn, 
-                book.title, 
-                book.author
-              );
-            }
-            
-            // Return book with enhanced cover if found
-            if (enhancedCover) {
-              return { ...book, coverImage: enhancedCover };
-            }
-            
-            // Return original book if no enhanced cover found
-            return book;
-          } catch (error) {
-            console.error(`Error enhancing cover for ${book.title}:`, error);
-            return book;
-          }
-        })
-      );
-      
-      setBooks(enhancedBooks);
-      setIsLoadingBooks(false);
-    };
-    
-    enhanceBookCovers();
-  }, []);
   
   // Handle task completion
   const handleTaskComplete = (id: string, completed: boolean) => {

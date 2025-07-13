@@ -180,16 +180,6 @@ export const handleAuthCallback = async () => {
   }
 };
 
-const signOut = async () => {
-  const { error } = await supabase.auth.signOut();
-  if (error) {
-    console.warn('Sign-out failed:', error.message);
-  } else {
-    console.log('User successfully signed out');
-  }
-  return { error };
-};
-
 export const getCurrentUser = async () => {
   const { data, error } = await supabase.auth.getUser();
   if (error) {
@@ -204,9 +194,4 @@ export const getSession = async () => {
     console.warn('Failed to get session:', error.message);
   }
   return { session: data.session, error };
-};
-
-// Auth state change listener
-const onAuthStateChange = (callback: (event: string, session: any) => void) => {
-  return supabase.auth.onAuthStateChange(callback);
 };

@@ -16,8 +16,7 @@ import { Book } from '../types';
 import { useVoicePraiseStore } from '../store/voicePraiseStore';
 import { useSocialShare } from '../hooks/useSocialShare';
 import { useReadingProgress } from '../hooks/useReadingProgress';
-import { googleBooksService } from '../services/googleBooksService';
-import { openLibraryService } from '../services/openLibraryService';
+import { useBookCovers } from '../hooks/useBookCovers';
 
 const ReadingPage: React.FC = () => {
   const { bookId } = useParams();
@@ -25,15 +24,12 @@ const ReadingPage: React.FC = () => {
   const [book, setBook] = useState<Book | null>(null);
   const [currentPage, setCurrentPage] = useState<number>(0);
   const [note, setNote] = useState<string>('');
-  const [showSpicySceneModal, setShowSpicySceneModal] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
-  const [coverImage, setCoverImage] = useState<string>('');
-  const [isLoadingCover, setIsLoadingCover] = useState(false);
-  const [coverError, setCoverError] = useState(false);
-  const [retryCount, setRetryCount] = useState(0);
   const [spiceRating, setSpiceRating] = useState<number>(0);
   
+  const { isLoading: isLoadingCover } = useBookCovers(book ? [book] : []);
+
   const playPraise = useVoicePraiseStore(state => state.playPraise);
   const { shareProgress } = useSocialShare();
   const {
@@ -49,89 +45,14 @@ const ReadingPage: React.FC = () => {
     const foundBook = mockBooks.find(b => b.id === bookId);
     if (foundBook) {
       setBook(foundBook);
-      setCoverImage(foundBook.coverImage);
       setSpiceRating(foundBook.spiceRating);
       
       // Initialize with book's current page if no progress exists
       if (!progress) {
         setCurrentPage(foundBook.currentPage);
       }
-      
-      // Fetch enhanced cover from Google Books
-      fetchEnhancedCover(foundBook);
     }
   }, [bookId, progress]);
-
-  const fetchEnhancedCover = async (bookData: Book) => {
-    if (!bookData.isbn && !bookData.title) return;
-    if (retryCount > 2) return; // Limit retries to prevent infinite loops
-
-    setIsLoadingCover(true);
-    setCoverError(false);
-
-    try {
-      let enhancedCover = null;
-
-      // Try to get book by ISBN first
-      if (bookData.isbn) {
-        const googleBook = await googleBooksService.getBookByISBN(bookData.isbn);
-        if (googleBook?.imageLinks) {
-          // Prefer larger images for better quality
-          enhancedCover = googleBook.imageLinks.large || 
-                         googleBook.imageLinks.medium || 
-                         googleBook.imageLinks.small || 
-                         googleBook.imageLinks.thumbnail;
-        }
-      }
-
-      // If no cover from ISBN, try searching by title and author
-      if (!enhancedCover && bookData.title) {
-        const searchResults = await googleBooksService.searchBooks(`${bookData.title} ${bookData.author}`, 1);
-        if (searchResults.length > 0 && searchResults[0].imageLinks) {
-          const imageLinks = searchResults[0].imageLinks;
-          enhancedCover = imageLinks.large || 
-                         imageLinks.medium || 
-                         imageLinks.small || 
-                         imageLinks.thumbnail;
-        }
-      }
-
-      // If still no cover, try Open Library
-      if (!enhancedCover) {
-        enhancedCover = await openLibraryService.getBestCoverImage(
-          bookData.isbn, 
-          bookData.title, 
-          bookData.author
-        );
-      }
-
-      // Use enhanced cover if found
-      if (enhancedCover) {
-        // Validate the image URL
-        const isValid = await validateImageUrl(enhancedCover);
-        if (isValid) {
-          setCoverImage(enhancedCover);
-        } else {
-          setCoverError(true);
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching enhanced cover:', error);
-      setCoverError(true);
-    } finally {
-      setIsLoadingCover(false);
-    }
-  };
-
-  const validateImageUrl = async (url: string): Promise<boolean> => {
-    try {
-      const response = await fetch(url, { method: 'HEAD' });
-      return response.ok;
-    } catch (error) {
-      console.warn('Image validation failed:', error);
-      return false;
-    }
-  };
 
   useEffect(() => {
     // Set current page from progress when it loads

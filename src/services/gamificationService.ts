@@ -130,7 +130,7 @@ class GamificationService {
   ): Promise<UserActivity | null> {
     try {
       const themedDay = getCurrentThemedDay();
-      let basePoints = this.calculateBasePoints(activityType, activityData);
+      const basePoints = this.calculateBasePoints(activityType, activityData);
       
       // Apply themed day multipliers
       const multiplier = this.getThemedDayMultiplier(activityType, themedDay);

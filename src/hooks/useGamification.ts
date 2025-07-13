@@ -28,8 +28,6 @@ export const useGamification = (): UseGamificationReturn => {
   const [streakStats, setStreakStats] = useState<StreakStats | null>(null);
   const [todaysChallenges, setTodaysChallenges] = useState<DailyChallenge[]>([]);
   const [recentActivities, setRecentActivities] = useState<UserActivity[]>([]);
-  const [availableRewards, setAvailableRewards] = useState<SpicySurprise[]>([]);
-  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

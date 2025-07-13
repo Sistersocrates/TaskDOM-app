@@ -2,7 +2,6 @@ import { create } from 'zustand';
 import { VoiceSettings, VoiceTriggerType, VoiceScript } from '../types/voice';
 import { elevenLabsService, ElevenLabsVoice } from '../services/elevenLabsService';
 import { scriptPacks, getScriptsForEvent, getRandomScript, ScriptPack } from '../data/scriptPacks';
-import { csvScripts, getCSVScriptsForEvent, getRandomCSVScript, CSVScript } from '../data/csvScriptPacks';
 import { useUserStore } from './userStore';
 
 interface VoicePraiseState {
