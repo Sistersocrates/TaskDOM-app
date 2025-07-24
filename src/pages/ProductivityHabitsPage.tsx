@@ -3,7 +3,7 @@ import MainLayout from '../components/layout/MainLayout';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Input from '../components/ui/Input';
-import { Calendar, Clock, Target, TrendingUp, Plus, CheckCircle, Flame, BookOpen, Coffee, Dumbbell, Moon, Droplets, Edit3, Trash2, BarChart3, Settings, FolderSync as Sync, ExternalLink, Award, Zap, List, AlignLeft, Save, X } from 'lucide-react';
+import { Calendar, Clock, Target, TrendingUp, Plus, CheckCircle, Flame, BookOpen, Coffee, Dumbbell, Moon, Droplets, Edit3, Trash2, BarChart3, Settings, FolderSync as Sync, ExternalLink, Award, Zap, List, AlignLeft, Save, X, Check, Bell, Sparkles } from 'lucide-react';
 import { useVoicePraiseStore } from '../store/voicePraiseStore';
 import { useUserStore } from '../store/userStore';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -47,6 +47,38 @@ interface BraindumpNote {
   tags: string[];
 }
 
+// Predefined habits by category
+const PREDEFINED_HABITS = {
+  reading: [
+    { name: 'Daily Reading Ritual', icon: '📚', description: 'Read for at least 30 minutes every day' },
+    { name: 'Conquer a Chapter', icon: '📖', description: 'Complete at least one chapter daily' },
+    { name: 'Tame the TBR Hydra', icon: '🐉', description: 'Reduce your to-be-read pile' },
+    { name: 'Rate the Spice', icon: '🌶️', description: 'Rate the spice level of what you read today' },
+    { name: 'Explore New Tropes', icon: '🔍', description: 'Try a book with a trope you haven\'t read before' },
+    { name: 'Expand the Library', icon: '🏛️', description: 'Add a new book to your collection' },
+    { name: 'Leave an Offering (Review)', icon: '✍️', description: 'Write a review for a completed book' },
+    { name: 'Share the Lore', icon: '📣', description: 'Share your reading progress or thoughts' }
+  ],
+  personal: [
+    { name: 'Hone Your Craft', icon: '🧵', description: 'Practice a creative skill for 20 minutes' },
+    { name: 'Decipher Ancient Tomes', icon: '📜', description: 'Learn something new today' },
+    { name: 'Train for Battle (Fitness)', icon: '💪', description: 'Complete a workout or physical activity' },
+    { name: 'Brew a Potion (Hydration)', icon: '🧪', description: 'Drink at least 8 glasses of water' },
+    { name: 'Mind Fortress (Meditation)', icon: '🧘', description: 'Meditate for at least 10 minutes' },
+    { name: 'Scry the Soul (Journaling)', icon: '📓', description: 'Write in your journal' },
+    { name: 'Seek Forbidden Knowledge', icon: '🔮', description: 'Research a topic you\'re curious about' }
+  ],
+  productivity: [
+    { name: 'Dominate the Day', icon: '📅', description: 'Plan your day in the morning' },
+    { name: 'Slay the Inbox Dragon', icon: '📧', description: 'Clear your email inbox' },
+    { name: 'Sanctum Upkeep', icon: '🧹', description: 'Clean or organize your space' },
+    { name: 'Forge Alliances (Social)', icon: '🤝', description: 'Connect with a friend or family member' },
+    { name: 'Manage the Treasury', icon: '💰', description: 'Review your finances' },
+    { name: 'Organize the Armory', icon: '🗃️', description: 'Declutter a space or digital files' },
+    { name: 'Prepare Provisions (Meal Prep)', icon: '🍱', description: 'Prepare meals in advance' }
+  ]
+};
+
 const ProductivityHabitsPage: React.FC = () => {
   const { playPraise } = useVoicePraiseStore();
   const { user } = useUserStore();
@@ -57,6 +89,8 @@ const ProductivityHabitsPage: React.FC = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [activeTab, setActiveTab] = useState<'overview' | 'habits' | 'calendar' | 'analytics' | 'braindump'>('overview');
   const [isCalendarConnected, setIsCalendarConnected] = useState(false);
+  
+  // Enhanced habit creation state
   const [newHabit, setNewHabit] = useState({
     name: '',
     description: '',
@@ -67,6 +101,8 @@ const ProductivityHabitsPage: React.FC = () => {
     icon: '📚',
     color: '#DC2626'
   });
+  const [selectedCategory, setSelectedCategory] = useState('reading');
+  const [selectedPredefinedHabit, setSelectedPredefinedHabit] = useState<number | null>(null);
   
   // Braindump state
   const [notes, setNotes] = useState<BraindumpNote[]>([]);
@@ -186,6 +222,17 @@ const ProductivityHabitsPage: React.FC = () => {
     setNotes(sampleNotes);
   }, []);
 
+  const handleSelectPredefinedHabit = (index: number) => {
+    const habit = PREDEFINED_HABITS[selectedCategory as keyof typeof PREDEFINED_HABITS][index];
+    setSelectedPredefinedHabit(index);
+    setNewHabit(prev => ({
+      ...prev,
+      name: habit.name,
+      description: habit.description,
+      icon: habit.icon
+    }));
+  };
+
   const handleAddHabit = () => {
     if (!newHabit.name.trim()) return;
 
@@ -212,6 +259,7 @@ const ProductivityHabitsPage: React.FC = () => {
       icon: '📚',
       color: '#DC2626'
     });
+    setSelectedPredefinedHabit(null);
     setShowAddHabit(false);
     playPraise('task_complete');
   };
@@ -237,6 +285,16 @@ const ProductivityHabitsPage: React.FC = () => {
       }
       return habit;
     }));
+  };
+
+  const handleToggleHabit = (id: string) => {
+    setHabits(prev => prev.map(habit => 
+      habit.id === id ? { ...habit, completedToday: !habit.completedToday } : habit
+    ));
+  };
+  
+  const handleDeleteHabit = (id: string) => {
+    setHabits(prev => prev.filter(habit => habit.id !== id));
   };
 
   const connectGoogleCalendar = async () => {
@@ -306,6 +364,27 @@ const ProductivityHabitsPage: React.FC = () => {
     health: 'bg-green-900/20 text-green-300',
     productivity: 'bg-blue-900/20 text-blue-300',
     wellness: 'bg-purple-900/20 text-purple-300'
+  };
+
+  const renderIconOptions = () => {
+    const icons = ['📚', '💧', '🏃', '🧘', '🌙', '☀️', '📝', '🎯', '⏰', '🍎', '🧠', '❤️', '📵', '🔄', '👥', '⭐'];
+    
+    return (
+      <div className="grid grid-cols-8 gap-2">
+        {icons.map((icon, index) => (
+          <button
+            key={index}
+            type="button"
+            onClick={() => setNewHabit(prev => ({ ...prev, icon }))}
+            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-all ${
+              newHabit.icon === icon ? 'bg-accent text-white' : 'bg-card hover:bg-border'
+            }`}
+          >
+            {icon}
+          </button>
+        ))}
+      </div>
+    );
   };
   
   // Braindump functions
@@ -382,41 +461,6 @@ const ProductivityHabitsPage: React.FC = () => {
   
   const removeTag = (tag: string) => {
     setNoteTags(prev => prev.filter(t => t !== tag));
-  };
-  
-  const formatNoteContent = (content: string, isBulletList: boolean) => {
-    if (!isBulletList) return content;
-    
-    return content.split('\n').map((line, index) => {
-      if (line.trim().startsWith('- ')) return line;
-      if (line.trim().startsWith('• ')) return line;
-      if (line.trim().startsWith('* ')) return line;
-      if (line.trim().startsWith('1. ')) return line;
-      if (line.trim().startsWith('2. ')) return line;
-      if (line.trim().startsWith('3. ')) return line;
-      if (line.trim().startsWith('4. ')) return line;
-      if (line.trim().startsWith('5. ')) return line;
-      if (line.trim().startsWith('6. ')) return line;
-      if (line.trim().startsWith('7. ')) return line;
-      if (line.trim().startsWith('8. ')) return line;
-      if (line.trim().startsWith('9. ')) return line;
-      if (line.trim().startsWith('10. ')) return line;
-      if (line.trim() === '') return line;
-      return `- ${line}`;
-    }).join('\n');
-  };
-  
-  const filterNotesByTag = (tag: string) => {
-    if (tag === 'all') return notes;
-    return notes.filter(note => note.tags.includes(tag));
-  };
-  
-  const getAllTags = () => {
-    const allTags = new Set<string>();
-    notes.forEach(note => {
-      note.tags.forEach(tag => allTags.add(tag));
-    });
-    return Array.from(allTags);
   };
 
   return (
@@ -665,77 +709,126 @@ const ProductivityHabitsPage: React.FC = () => {
               exit={{ opacity: 0, y: -20 }}
               className="space-y-6"
             >
-              {/* Habit Categories */}
-              {Object.entries(
-                habits.reduce((acc, habit) => {
-                  if (!acc[habit.category]) acc[habit.category] = [];
-                  acc[habit.category].push(habit);
-                  return acc;
-                }, {} as Record<string, Habit[]>)
-              ).map(([category, categoryHabits]) => {
-                const Icon = categoryIcons[category as keyof typeof categoryIcons];
-                
-                return (
-                  <Card key={category}>
-                    <CardHeader>
-                      <h2 className="text-xl font-semibold text-white flex items-center">
-                        <Icon className="mr-2" />
-                        {category.charAt(0).toUpperCase() + category.slice(1)} Habits
-                      </h2>
-                    </CardHeader>
-                    <CardBody>
-                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {categoryHabits.map((habit) => (
-                          <div
-                            key={habit.id}
-                            className="p-4 border border-gray-700 rounded-lg bg-gray-800"
-                          >
-                            <div className="flex items-center justify-between mb-3">
-                              <div className="flex items-center space-x-2">
-                                <span className="text-2xl">{habit.icon}</span>
-                                <div>
-                                  <h3 className="font-medium text-white">{habit.name}</h3>
-                                  <p className="text-xs text-gray-400">{habit.targetType}</p>
-                                </div>
+              {/* Habits List */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {habits.map((habit) => (
+                  <motion.div
+                    key={habit.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3 }}
+                    className="group"
+                  >
+                    <Card className={`overflow-hidden transition-all duration-300 ${
+                      habit.completedToday ? 'border-success-600/50 bg-success-900/10' : ''
+                    }`}>
+                      <CardBody className="p-0">
+                        <div className="p-5">
+                          <div className="flex items-center justify-between mb-4">
+                            <div className="flex items-center">
+                              <div className="w-10 h-10 flex items-center justify-center text-xl rounded-lg bg-card border border-border mr-3">
+                                {habit.icon}
                               </div>
-                              <div className="flex items-center space-x-1">
-                                <Button size="sm" variant="ghost">
-                                  <Edit3 className="h-3 w-3" />
-                                </Button>
-                                <Button size="sm" variant="ghost">
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
+                              <div>
+                                <h3 className="font-medium text-white">{habit.name}</h3>
+                                <p className="text-xs text-gray-400">{habit.description}</p>
                               </div>
                             </div>
-                            
-                            <p className="text-sm text-gray-400 mb-3">{habit.description}</p>
-                            
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-400">Target</span>
-                                <span className="text-white">{habit.targetValue} {habit.unit}</span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-400">Streak</span>
-                                <span className="text-white flex items-center">
-                                  <Flame className="h-3 w-3 mr-1 text-orange-400" />
-                                  {habit.streak} days
-                                </span>
-                              </div>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-400">Status</span>
-                                <span className={`text-sm ${habit.isActive ? 'text-green-400' : 'text-gray-400'}`}>
-                                  {habit.isActive ? 'Active' : 'Paused'}
-                                </span>
-                              </div>
+                            <div className="flex items-center space-x-1">
+                              <button
+                                onClick={() => handleToggleHabit(habit.id)}
+                                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+                                  habit.completedToday 
+                                    ? 'bg-success-600/20 text-success-400 hover:bg-success-600/30' 
+                                    : 'bg-card hover:bg-border text-gray-400 hover:text-white'
+                                }`}
+                              >
+                                <Check size={18} />
+                              </button>
+                              <button
+                                onClick={() => handleDeleteHabit(habit.id)}
+                                className="w-8 h-8 rounded-lg bg-card hover:bg-border text-gray-400 hover:text-error-400 flex items-center justify-center transition-colors"
+                              >
+                                <Trash2 size={18} />
+                              </button>
                             </div>
                           </div>
-                        ))}
+                          
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center text-sm">
+                              <Flame className="h-4 w-4 text-accent mr-1" />
+                              <span className="text-gray-400">
+                                {habit.streak} day streak
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {habit.completedToday ? 'Completed today' : 'Not completed yet'}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {/* Progress Bar */}
+                        <div className="h-1 w-full bg-border">
+                          <div 
+                            className="h-full bg-accent transition-all duration-500"
+                            style={{ width: habit.completedToday ? '100%' : '0%' }}
+                          ></div>
+                        </div>
+                      </CardBody>
+                    </Card>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Tips Section */}
+              <Card>
+                <CardHeader>
+                  <h2 className="text-xl font-bold text-white">Reading Habit Tips</h2>
+                </CardHeader>
+                <CardBody>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="flex items-start">
+                      <div className="p-2 bg-purple-900/20 rounded-lg border border-purple-700/30 mr-3">
+                        <Clock className="h-5 w-5 text-purple-400" />
                       </div>
-                    </CardBody>
-                  </Card>
-                );
-              })}
+                      <div>
+                        <h3 className="font-medium text-white mb-1">Consistent Time</h3>
+                        <p className="text-sm text-gray-400">Read at the same time each day to build a strong habit.</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start">
+                      <div className="p-2 bg-green-900/20 rounded-lg border border-green-700/30 mr-3">
+                        <BookOpen className="h-5 w-5 text-green-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-white mb-1">Start Small</h3>
+                        <p className="text-sm text-gray-400">Begin with just 10 minutes of reading and gradually increase.</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start">
+                      <div className="p-2 bg-blue-900/20 rounded-lg border border-blue-700/30 mr-3">
+                        <Bell className="h-5 w-5 text-blue-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-white mb-1">Set Reminders</h3>
+                        <p className="text-sm text-gray-400">Use notifications to remind you of your reading time.</p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-start">
+                      <div className="p-2 bg-amber-900/20 rounded-lg border border-amber-700/30 mr-3">
+                        <Sparkles className="h-5 w-5 text-amber-400" />
+                      </div>
+                      <div>
+                        <h3 className="font-medium text-white mb-1">Reward Yourself</h3>
+                        <p className="text-sm text-gray-400">Celebrate streaks and milestones to stay motivated.</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardBody>
+              </Card>
             </motion.div>
           )}
 
@@ -1138,102 +1231,140 @@ const ProductivityHabitsPage: React.FC = () => {
           )}
         </AnimatePresence>
 
-        {/* Add Habit Modal */}
+        {/* Enhanced Add Habit Modal */}
         {showAddHabit && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <Card className="max-w-md w-full">
-              <CardHeader>
-                <h2 className="text-xl font-semibold text-white">Add New Habit</h2>
-              </CardHeader>
-              <CardBody className="space-y-4">
-                <Input
-                  label="Habit Name"
-                  value={newHabit.name}
-                  onChange={(e) => setNewHabit(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="e.g., Daily Reading"
-                />
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Description</label>
-                  <textarea
-                    value={newHabit.description}
-                    onChange={(e) => setNewHabit(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Describe your habit..."
-                    className="w-full p-2 border border-gray-700 rounded-lg bg-gray-800 text-white"
-                    rows={3}
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Category</label>
-                  <select
-                    value={newHabit.category}
-                    onChange={(e) => setNewHabit(prev => ({ ...prev, category: e.target.value as any }))}
-                    className="w-full p-2 border border-gray-700 rounded-lg bg-gray-800 text-white"
-                  >
-                    <option value="reading">Reading</option>
-                    <option value="health">Health</option>
-                    <option value="productivity">Productivity</option>
-                    <option value="wellness">Wellness</option>
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Target</label>
-                    <Input
-                      type="number"
-                      value={newHabit.targetValue}
-                      onChange={(e) => setNewHabit(prev => ({ ...prev, targetValue: parseInt(e.target.value) || 1 }))}
-                      min="1"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">Unit</label>
-                    <Input
-                      value={newHabit.unit}
-                      onChange={(e) => setNewHabit(prev => ({ ...prev, unit: e.target.value }))}
-                      placeholder="e.g., minutes, times"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">Icon</label>
-                  <div className="grid grid-cols-6 gap-2">
-                    {['📚', '🌶️', '💧', '💪', '🧘', '☕', '🎯', '⏰'].map((icon) => (
-                      <button
-                        key={icon}
-                        onClick={() => setNewHabit(prev => ({ ...prev, icon }))}
-                        className={`p-2 text-2xl border rounded-lg transition-all ${
-                          newHabit.icon === icon 
-                            ? 'border-primary-500 bg-primary-900/20' 
-                            : 'border-gray-700 hover:border-gray-600'
-                        }`}
-                      >
-                        {icon}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex space-x-3 pt-4">
-                  <Button
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-lg max-h-[90vh] flex flex-col"
+            >
+              <Card className="flex flex-col max-h-full">
+                <CardHeader className="flex flex-row items-center justify-between border-b border-border flex-shrink-0">
+                  <h2 className="text-xl font-bold text-white">Add New Reading Habit</h2>
+                  <button
                     onClick={() => setShowAddHabit(false)}
-                    variant="outline"
-                    fullWidth
+                    className="text-gray-400 hover:text-white transition-colors"
                   >
+                    <X size={20} />
+                  </button>
+                </CardHeader>
+                <CardBody className="p-6 overflow-y-auto">
+                  <div className="space-y-6">
+                    {/* Category Selection */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Habit Category
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                        {Object.keys(PREDEFINED_HABITS).map((category) => (
+                          <button
+                            key={category}
+                            type="button"
+                            onClick={() => {
+                              setSelectedCategory(category);
+                              setSelectedPredefinedHabit(null);
+                            }}
+                            className={`p-2 rounded-lg text-center transition-all ${
+                              selectedCategory === category 
+                                ? 'bg-accent/20 border border-accent/50 text-white' 
+                                : 'bg-card border border-border text-gray-400 hover:bg-border'
+                            }`}
+                          >
+                            <div className="capitalize">{category}</div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    {/* Predefined Habits */}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">
+                        Select a Predefined Habit
+                      </label>
+                      <div className="max-h-48 overflow-y-auto border border-border rounded-lg divide-y divide-border">
+                        {PREDEFINED_HABITS[selectedCategory as keyof typeof PREDEFINED_HABITS].map((habit, index) => (
+                          <button
+                            key={index}
+                            type="button"
+                            onClick={() => handleSelectPredefinedHabit(index)}
+                            className={`w-full p-3 text-left flex items-center transition-all ${
+                              selectedPredefinedHabit === index 
+                                ? 'bg-accent/20 text-white' 
+                                : 'hover:bg-card text-gray-300'
+                            }`}
+                          >
+                            <span className="text-xl mr-3">{habit.icon}</span>
+                            <div>
+                              <div className="font-medium">{habit.name}</div>
+                              <div className="text-xs text-gray-400">{habit.description}</div>
+                            </div>
+                            {selectedPredefinedHabit === index && (
+                              <Check className="ml-auto h-5 w-5 text-accent" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                    
+                    <div className="border-t border-border pt-4">
+                      <h3 className="text-lg font-medium text-white mb-4">Customize Habit</h3>
+                      
+                      {/* Custom Habit Name */}
+                      <div className="mb-4">
+                        <Input
+                          label="Habit Name"
+                          value={newHabit.name}
+                          onChange={(e) => setNewHabit(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="e.g., Read for 30 minutes"
+                          fullWidth
+                        />
+                      </div>
+                      
+                      {/* Custom Description */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Description
+                        </label>
+                        <textarea
+                          value={newHabit.description}
+                          onChange={(e) => setNewHabit(prev => ({ ...prev, description: e.target.value }))}
+                          placeholder="Brief description of this habit"
+                          className="w-full p-3 bg-card border border-border rounded-lg text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-accent"
+                          rows={2}
+                        />
+                      </div>
+                      
+                      {/* Icon Selection */}
+                      <div className="mb-4">
+                        <label className="block text-sm font-medium text-gray-300 mb-2">
+                          Icon
+                        </label>
+                        {renderIconOptions()}
+                      </div>
+                    </div>
+                  </div>
+                </CardBody>
+                
+                {/* Action Buttons - Fixed at bottom */}
+                <div className="flex justify-end space-x-3 p-4 border-t border-border mt-auto">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowAddHabit(false)}
+                  >
+                    <X size={18} className="mr-2" />
                     Cancel
                   </Button>
                   <Button
                     onClick={handleAddHabit}
-                    fullWidth
+                    disabled={!newHabit.name.trim()}
                   >
-                    Add Habit
+                    <Save size={18} className="mr-2" />
+                    Save Habit
                   </Button>
                 </div>
-              </CardBody>
-            </Card>
+              </Card>
+            </motion.div>
           </div>
         )}
       </div>
