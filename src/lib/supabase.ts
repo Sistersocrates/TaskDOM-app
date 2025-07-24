@@ -17,11 +17,31 @@ if (!supabaseAnonKey || supabaseAnonKey === 'your_supabase_anon_key_here') {
 try {
   new URL(supabaseUrl);
 } catch (error) {
-  throw new Error(`Invalid VITE_SUPABASE_URL format: "${supabaseUrl}". Please ensure it's a valid URL starting with https://`);
+  throw new Error(`Invalid VITE_SUPABASE_URL format: "${supabaseUrl}". Please ensure it's a valid URL like "https://your-project-ref.supabase.co"`);
 }
 
-// Create Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Force production URL for auth redirects
+const getProductionUrl = () => {
+  if (typeof window !== 'undefined') {
+    // In production, use the current origin
+    if (window.location.hostname !== 'localhost') {
+      return window.location.origin;
+    }
+  }
+  // Fallback to environment variable or custom domain
+  return import.meta.env.VITE_SITE_URL || 'https://taskdom.app';
+};
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    // Force the site URL to be production URL
+    redirectTo: `${getProductionUrl()}/auth/callback`,
+  },
+});
 
 // Auth helpers
 export const signUp = async (email: string, password: string, firstName?: string) => {
@@ -31,23 +51,18 @@ export const signUp = async (email: string, password: string, firstName?: string
       email,
       password,
       options: {
-        // Disable email confirmation for easier testing
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
         data: {
-          email: email,
-          full_name: firstName || '',
-        }
-      }
+          first_name: firstName,
+          full_name: firstName,
+        },
+        emailRedirectTo: `${getProductionUrl()}/auth/callback`,
+      },
     });
     
     if (error) {
-      // Use console.warn for expected authentication failures
-      console.warn('Sign-up attempt failed:', error.message);
+      console.warn('Sign-up failed:', error.message);
     } else {
       console.log('Sign-up successful, user:', data.user?.id);
-      
-      // We don't need to create a profile here anymore
-      // The database trigger will handle profile creation
     }
     
     return { data, error };
@@ -66,18 +81,9 @@ export const signIn = async (email: string, password: string) => {
     });
     
     if (error) {
-      // Use console.warn for expected authentication failures instead of console.error
-      // This reduces noise in the console for normal user authentication attempts
-      if (error.message.includes('Invalid login credentials')) {
-        console.warn('Sign-in attempt with invalid credentials - this is normal user behavior');
-      } else {
-        console.warn('Sign-in attempt failed:', error.message);
-      }
-    } else if (data.user) {
-      console.log('User successfully signed in:', data.user.email);
-      
-      // We don't need to check/create profile here anymore
-      // The profile should already exist, and if not, other mechanisms will handle it
+      console.warn('Sign-in failed:', error.message);
+    } else {
+      console.log('Sign-in successful, user:', data.user?.id);
     }
     
     return { data, error };
@@ -87,96 +93,217 @@ export const signIn = async (email: string, password: string) => {
   }
 };
 
-// Base64 URL encode function for PKCE
-function base64URLEncode(buffer: ArrayBuffer): string {
-  return btoa(String.fromCharCode.apply(null, new Uint8Array(buffer) as unknown as number[]))
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-}
-
-// Generate a random string for code verifier
-function generateRandomString(length: number): string {
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
-  let text = '';
-  
-  for (let i = 0; i < length; i++) {
-    text += possible.charAt(Math.floor(Math.random() * possible.length));
-  }
-  
-  return text;
-}
-
-// Generate code challenge from verifier using SHA-256
-async function generateCodeChallenge(verifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(verifier);
-  const digest = await crypto.subtle.digest('SHA-256', data);
-  
-  return base64URLEncode(digest);
-}
-
 export const signInWithGoogle = async () => {
   try {
-    // Generate a random code verifier (43-128 chars)
-    const codeVerifier = generateRandomString(64);
-    
-    // Store code verifier in localStorage for later use
-    localStorage.setItem('pkce_code_verifier', codeVerifier);
-    
-    // Generate code challenge using SHA-256
-    const codeChallenge = await generateCodeChallenge(codeVerifier);
-    
+    console.log('🚀 Starting Google OAuth with PKCE...');
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
+        redirectTo: `${getProductionUrl()}/auth/callback`,
         queryParams: {
-          client_id: '522040165864-p4fb218qtvvtk889smq1901h3j71op88.apps.googleusercontent.com',
-          code_challenge: codeChallenge,
-          code_challenge_method: 'S256',
           access_type: 'offline',
           prompt: 'consent',
         },
-        redirectTo: `${window.location.origin}/auth/callback`,
-        scopes: 'email profile',
+        // Enable PKCE flow for better security
+        flowType: 'pkce'
       },
     });
     
     if (error) {
-      console.warn('Google sign-in failed:', error.message);
-      throw error;
+      console.error('❌ Google sign-in failed:', error.message);
+    } else {
+      console.log('✅ Google sign-in initiated with PKCE');
     }
     
-    return { data, error: null };
+    return { data, error };
   } catch (error) {
-    console.error('Error signing in with Google:', error);
+    console.error('❌ Unexpected error during Google sign-in:', error);
+    return { data: null, error };
+  }
+};
+
+export const resetPassword = async (email: string) => {
+  try {
+    console.log('Attempting to send password reset email to:', email);
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${getProductionUrl()}/reset-password`,
+    });
+    
+    if (error) {
+      console.warn('Password reset request failed:', error.message);
+    } else {
+      console.log('Password reset email sent successfully');
+    }
+    
+    return { data, error };
+  } catch (error) {
+    console.error('Unexpected error during password reset:', error);
+    return { data: null, error };
+  }
+};
+
+export const updatePassword = async (newPassword: string) => {
+  try {
+    console.log('Attempting to update password');
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword
+    });
+    
+    if (error) {
+      console.warn('Password update failed:', error.message);
+    } else {
+      console.log('Password updated successfully');
+    }
+    
+    return { data, error };
+  } catch (error) {
+    console.error('Unexpected error during password update:', error);
     return { data: null, error };
   }
 };
 
 export const handleAuthCallback = async () => {
   try {
-    // Get the code verifier from localStorage
-    const codeVerifier = localStorage.getItem('pkce_code_verifier');
+    console.log('=== AUTH CALLBACK START ===');
+    console.log('Starting auth callback process...');
+    console.log('Current URL:', window.location.href);
     
-    if (!codeVerifier) {
-      throw new Error('No code verifier found. The authentication flow may have been interrupted.');
+    // Get the current URL to extract the authorization code
+    const url = new URL(window.location.href);
+    const code = url.searchParams.get('code');
+    const error_param = url.searchParams.get('error');
+    const error_description = url.searchParams.get('error_description');
+    const state = url.searchParams.get('state');
+    
+    console.log('URL Parameters:');
+    console.log('- code:', code ? 'PRESENT' : 'MISSING');
+    console.log('- error:', error_param);
+    console.log('- error_description:', error_description);
+    console.log('- state:', state ? 'PRESENT' : 'MISSING');
+    
+    // Check for OAuth errors first
+    if (error_param) {
+      console.error('OAuth error detected:', error_param, error_description);
+      return { 
+        data: null, 
+        error: { message: error_description || error_param } 
+      };
     }
     
-    // Exchange the authorization code for a token
-    const { data, error } = await supabase.auth.exchangeCodeForSession(
-      window.location.search.substring(1)
-    );
-    
-    // Clean up
-    localStorage.removeItem('pkce_code_verifier');
-    
-    if (error) throw error;
-    
-    return { data, error: null };
+    if (code) {
+      console.log('✅ Authorization code found, attempting exchange...');
+      console.log('Code length:', code.length);
+      
+      try {
+        // Exchange the authorization code for a session
+        console.log('Calling supabase.auth.exchangeCodeForSession...');
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code);
+        
+        console.log('Exchange result:');
+        console.log('- data:', data);
+        console.log('- error:', error);
+        console.log('- session exists:', !!data?.session);
+        console.log('- user exists:', !!data?.user);
+        
+        if (error) {
+          console.error('❌ Code exchange failed:', error);
+          return { data: null, error };
+        }
+        
+        if (data?.session && data?.user) {
+          console.log('✅ Auth callback successful!');
+          console.log('User ID:', data.user.id);
+          console.log('User email:', data.user.email);
+          console.log('Session expires at:', data.session.expires_at);
+          return { data, error: null };
+        } else {
+          console.warn('❌ Code exchange succeeded but no session/user data');
+          console.log('Data received:', JSON.stringify(data, null, 2));
+          return { 
+            data: null, 
+            error: { message: 'No session data returned from authentication' } 
+          };
+        }
+      } catch (exchangeError) {
+        console.error('❌ Exception during code exchange:', exchangeError);
+        return { 
+          data: null, 
+          error: { message: 'Code exchange failed: ' + exchangeError.message } 
+        };
+      }
+    } else {
+      console.log('❌ No authorization code found, checking for existing session...');
+      
+      try {
+        // Fallback to getting current session
+        const { data, error } = await supabase.auth.getSession();
+        
+        console.log('Session check result:');
+        console.log('- data:', data);
+        console.log('- error:', error);
+        console.log('- session exists:', !!data?.session);
+        
+        if (error) {
+          console.error('Session check error:', error.message);
+          return { data: null, error };
+        }
+        
+        if (data?.session) {
+          console.log('✅ Found existing session');
+          return { data, error: null };
+        } else {
+          console.warn('❌ No session found');
+          return { 
+            data: null, 
+            error: { message: 'No active session found and no authorization code provided' } 
+          };
+        }
+      } catch (sessionError) {
+        console.error('❌ Exception during session check:', sessionError);
+        return { 
+          data: null, 
+          error: { message: 'Session check failed: ' + sessionError.message } 
+        };
+      }
+    }
   } catch (error) {
-    console.error('Error handling auth callback:', error);
-    return { data: null, error };
+    console.error('❌ Unexpected error in auth callback:', error);
+    console.log('Error details:', JSON.stringify(error, null, 2));
+    return { data: null, error: { message: 'Unexpected authentication error: ' + error.message } };
+  } finally {
+    console.log('=== AUTH CALLBACK END ===');
+  }
+};
+
+export const getCurrentUser = async () => {
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser();
+    
+    if (error) {
+      console.warn('Failed to get current user:', error.message);
+      return { user: null, error };
+    }
+    
+    return { user, error: null };
+  } catch (error) {
+    console.error('Unexpected error getting current user:', error);
+    return { user: null, error };
+  }
+};
+
+export const getSession = async () => {
+  try {
+    const { data: { session }, error } = await supabase.auth.getSession();
+    
+    if (error) {
+      console.warn('Failed to get session:', error.message);
+      return { session: null, error };
+    }
+    
+    return { session, error: null };
+  } catch (error) {
+    console.error('Unexpected error getting session:', error);
+    return { session: null, error };
   }
 };
 
@@ -185,28 +312,10 @@ const signOut = async () => {
   if (error) {
     console.warn('Sign-out failed:', error.message);
   } else {
-    console.log('User successfully signed out');
+    console.log('Sign-out successful');
   }
   return { error };
 };
 
-export const getCurrentUser = async () => {
-  const { data, error } = await supabase.auth.getUser();
-  if (error) {
-    console.warn('Failed to get current user:', error.message);
-  }
-  return { user: data.user, error };
-};
+export { signOut };
 
-export const getSession = async () => {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) {
-    console.warn('Failed to get session:', error.message);
-  }
-  return { session: data.session, error };
-};
-
-// Auth state change listener
-const onAuthStateChange = (callback: (event: string, session: any) => void) => {
-  return supabase.auth.onAuthStateChange(callback);
-};

@@ -15,11 +15,12 @@ interface BookSearchModalProps {
 
 const BookSearchModal: React.FC<BookSearchModalProps> = ({ isOpen, onClose, onAddBook }) => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [authorQuery, setAuthorQuery] = useState('');
   const [isbnQuery, setIsbnQuery] = useState('');
   const [searchResults, setSearchResults] = useState<GoogleBook[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'search' | 'isbn'>('search');
+  const [activeTab, setActiveTab] = useState<'search' | 'author' | 'isbn'>('search');
   const [imageLoadingStates, setImageLoadingStates] = useState<Record<string, boolean>>({});
   const [imageErrors, setImageErrors] = useState<Record<string, boolean>>({});
 
@@ -58,6 +59,25 @@ const BookSearchModal: React.FC<BookSearchModalProps> = ({ isOpen, onClose, onAd
     } catch (err) {
       setError('Failed to search books. Please try again.');
       console.error('Error searching books:', err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleAuthorSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authorQuery.trim()) return;
+
+    try {
+      setIsLoading(true);
+      setError(null);
+      setImageLoadingStates({});
+      setImageErrors({});
+      const books = await googleBooksService.searchByAuthor(authorQuery.trim(), 20);
+      setSearchResults(books);
+    } catch (err) {
+      setError('Failed to search books by author. Please try again.');
+      console.error('Error searching books by author:', err);
     } finally {
       setIsLoading(false);
     }
@@ -213,6 +233,18 @@ const BookSearchModal: React.FC<BookSearchModalProps> = ({ isOpen, onClose, onAd
             Search Books
           </button>
           <button
+            onClick={() => setActiveTab('author')}
+            className={cn(
+              'flex-1 px-6 py-3 text-center font-medium transition-colors',
+              activeTab === 'author'
+                ? 'border-b-2 border-primary-500 text-primary-400 bg-red-900/20'
+                : 'text-gray-400 hover:text-primary-400 hover:bg-gray-800'
+            )}
+          >
+            <Users className="h-5 w-5 mx-auto mb-1" />
+            Search by Author
+          </button>
+          <button
             onClick={() => setActiveTab('isbn')}
             className={cn(
               'flex-1 px-6 py-3 text-center font-medium transition-colors',
@@ -254,6 +286,39 @@ const BookSearchModal: React.FC<BookSearchModalProps> = ({ isOpen, onClose, onAd
                   <p className="text-sm">Or search above to find specific books</p>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* Author Search Tab */}
+          {activeTab === 'author' && (
+            <div className="space-y-6">
+              <form onSubmit={handleAuthorSearch} className="flex space-x-3">
+                <Input
+                  type="text"
+                  placeholder="Search by author name..."
+                  value={authorQuery}
+                  onChange={(e) => setAuthorQuery(e.target.value)}
+                  className="flex-grow"
+                  fullWidth
+                />
+                <Button type="submit" disabled={isLoading} className="flex items-center">
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Search className="h-4 w-4" />
+                  )}
+                </Button>
+              </form>
+
+              <div className="bg-gray-800 p-4 rounded-lg">
+                <h3 className="font-medium mb-2 text-white">Author Search</h3>
+                <p className="text-sm text-gray-400 mb-2">
+                  Find all books by a specific author. Enter the author's name to see their complete bibliography.
+                </p>
+                <p className="text-sm text-gray-400">
+                  <strong>Examples:</strong> "Sarah J. Maas", "Colleen Hoover", "Rebecca Yarros"
+                </p>
+              </div>
             </div>
           )}
 
@@ -395,13 +460,15 @@ const BookSearchModal: React.FC<BookSearchModalProps> = ({ isOpen, onClose, onAd
           )}
 
           {/* No Results */}
-          {!isLoading && searchResults.length === 0 && (searchQuery || isbnQuery) && !error && (
+          {!isLoading && searchResults.length === 0 && (searchQuery || authorQuery || isbnQuery) && !error && (
             <div className="text-center py-12 text-gray-500">
               <Book className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p className="text-lg mb-2">No books found</p>
               <p className="text-sm">
                 {activeTab === 'search' 
                   ? 'Try different search terms or check the spelling'
+                  : activeTab === 'author'
+                  ? 'Try a different author name or check the spelling'
                   : 'Please check the ISBN and try again'
                 }
               </p>

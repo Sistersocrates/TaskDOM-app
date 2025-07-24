@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertCircle, Info, LogIn, Eye, EyeOff } from 'lucide-react';
 import { Card, CardBody, CardHeader } from '../ui/Card';
-import { supabase, signInWithGoogle, signIn, signUp } from '../../lib/supabase';
+import { supabase, signInWithGoogle, signIn, signUp, resetPassword } from '../../lib/supabase';
 import { useUserStore } from '../../store/userStore';
 import Button from '../ui/Button';
 import Input from '../ui/Input';
@@ -9,7 +9,7 @@ import Input from '../ui/Input';
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  initialView?: 'sign_in' | 'sign_up' | 'magic_link' | 'forgotten_password';
+  initialView?: 'sign_in' | 'sign_up' | 'magic_link' | 'forgot_password';
   onSuccess?: () => void;
 }
 
@@ -28,6 +28,7 @@ const AuthModal: React.FC<AuthModalProps> = ({
   const [firstName, setFirstName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [attemptedCredentials, setAttemptedCredentials] = useState<{email: string, password: string} | null>(null);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   const { initialize } = useUserStore();
 
   if (!isOpen) return null;
@@ -142,6 +143,35 @@ const AuthModal: React.FC<AuthModalProps> = ({
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!email) {
+      setError('Please enter your email address');
+      return;
+    }
+    
+    try {
+      setIsEmailLoading(true);
+      setError(null);
+      
+      const { error } = await resetPassword(email);
+      
+      if (error) {
+        console.warn('Password reset error:', error);
+        setError('Failed to send reset email. Please try again.');
+        return;
+      }
+      
+      setResetEmailSent(true);
+    } catch (err) {
+      console.error('Unexpected error during password reset:', err);
+      setError('An unexpected error occurred. Please try again.');
+    } finally {
+      setIsEmailLoading(false);
+    }
+  };
+
   const handleSwitchToSignUp = () => {
     if (attemptedCredentials) {
       // Pre-fill the email from the failed sign-in attempt
@@ -210,7 +240,8 @@ const AuthModal: React.FC<AuthModalProps> = ({
       <Card className="max-w-md w-full max-h-[calc(100vh-2rem)] flex flex-col">
         <CardHeader className="flex flex-row items-center justify-between border-b border-gray-800 flex-shrink-0">
           <h2 className="text-xl font-bold text-white">
-            {currentView === 'sign_in' ? 'Sign In' : 'Create Account'}
+            {currentView === 'sign_in' ? 'Sign In' : 
+             currentView === 'forgot_password' ? 'Reset Password' : 'Create Account'}
           </h2>
           <button
             onClick={onClose}
@@ -318,17 +349,102 @@ const AuthModal: React.FC<AuthModalProps> = ({
                   'Sign In'
                 )}
               </Button>
-              <p className="text-center text-sm text-gray-400">
-                Don't have an account?{' '}
+              <div className="flex justify-between items-center text-sm">
                 <button
                   type="button"
-                  onClick={handleSwitchToSignUp}
+                  onClick={() => setCurrentView('forgot_password')}
                   className="text-accent hover:text-accent-hover"
                 >
-                  Sign up
+                  Forgot password?
                 </button>
-              </p>
+                <span className="text-gray-400">
+                  Don't have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={handleSwitchToSignUp}
+                    className="text-accent hover:text-accent-hover"
+                  >
+                    Sign up
+                  </button>
+                </span>
+              </div>
             </form>
+          ) : currentView === 'forgot_password' ? (
+            <div className="space-y-4">
+              {resetEmailSent ? (
+                <div className="text-center space-y-4">
+                  <div className="p-4 bg-green-900/30 border border-green-700 rounded-lg">
+                    <div className="flex items-center justify-center space-x-2 mb-2">
+                      <Info className="h-5 w-5 text-green-400" />
+                      <h3 className="text-green-200 font-medium">Email Sent!</h3>
+                    </div>
+                    <p className="text-sm text-green-200">
+                      We've sent a password reset link to <strong>{email}</strong>. 
+                      Check your email and click the link to reset your password.
+                    </p>
+                  </div>
+                  <Button
+                    onClick={() => {
+                      setCurrentView('sign_in');
+                      setResetEmailSent(false);
+                      setError(null);
+                    }}
+                    variant="outline"
+                    fullWidth
+                  >
+                    Back to Sign In
+                  </Button>
+                </div>
+              ) : (
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div className="text-center mb-4">
+                    <p className="text-sm text-gray-400">
+                      Enter your email address and we'll send you a link to reset your password.
+                    </p>
+                  </div>
+                  <Input
+                    type="email"
+                    label="Email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    fullWidth
+                    required
+                  />
+                  <Button
+                    type="submit"
+                    fullWidth
+                    disabled={isEmailLoading}
+                  >
+                    {isEmailLoading ? (
+                      <span className="flex items-center justify-center">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Sending...
+                      </span>
+                    ) : (
+                      'Send Reset Link'
+                    )}
+                  </Button>
+                  <p className="text-center text-sm text-gray-400">
+                    Remember your password?{' '}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCurrentView('sign_in');
+                        setError(null);
+                        setResetEmailSent(false);
+                      }}
+                      className="text-accent hover:text-accent-hover"
+                    >
+                      Sign in
+                    </button>
+                  </p>
+                </form>
+              )}
+            </div>
           ) : (
             <form onSubmit={handleEmailSignUp} className="space-y-4">
               <Input

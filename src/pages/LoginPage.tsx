@@ -21,7 +21,7 @@ const LoginPage: React.FC = () => {
 
   const handleAuthSuccess = () => {
     setShowAuthModal(false);
-    navigate('/');
+    navigate('/dashboard');
   };
 
   return (

@@ -18,12 +18,13 @@ const Navbar: React.FC = () => {
   const { isAuthenticated, hasPermission } = useUserStore();
   
   const navItems: NavItem[] = [
-    { name: 'Home', icon: <Home size={20} />, path: '/' },
+    { name: 'Home', icon: <Home size={20} />, path: '/dashboard' },
     { name: 'Library', icon: <Book size={20} />, path: '/library', permission: 'read:all' },
     { name: 'Productivity', icon: <Target size={20} />, path: '/productivity', permission: 'read:all' },
     { name: 'Streaks', icon: <Flame size={20} />, path: '/streaks', permission: 'read:all' },
     { name: 'Analytics', icon: <BarChart size={20} />, path: '/analytics', permission: 'read:all' },
     { name: 'Voice', icon: <Volume2 size={20} />, path: '/praise-customizer', permission: 'use:voice' },
+    { name: 'Profile', icon: <User size={20} />, path: '/profile', permission: 'read:all' },
   ];
   
   // Filter nav items based on permissions

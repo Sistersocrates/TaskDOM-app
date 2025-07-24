@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
+import LandingPage from './pages/LandingPage';
 import HomePage from './pages/HomePage';
 import LoginPage from './pages/LoginPage';
 import LibraryPage from './pages/LibraryPage';
@@ -10,6 +11,7 @@ import BookClubPage from './pages/BookClubPage';
 import OnboardingPage from './pages/OnboardingPage';
 import VoiceSettingsPage from './pages/VoiceSettingsPage';
 import PraiseCustomizerPage from './pages/PraiseCustomizerPage';
+import PraiseLibraryPage from './pages/PraiseLibraryPage';
 import ProfilePage from './pages/ProfilePage';
 import SettingsPage from './pages/SettingsPage';
 import GamificationPage from './pages/GamificationPage';
@@ -19,9 +21,11 @@ import CheckoutCancelPage from './pages/CheckoutCancelPage';
 import ProductivityHabitsPage from './pages/ProductivityHabitsPage';
 import SharePage from './pages/SharePage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import ResetPasswordPage from './pages/ResetPasswordPage';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import SocialShareModal from './components/social/SocialShareModal';
 import AuthCallbackPage from './pages/AuthCallbackPage';
+import { PraiseProvider } from './components/praise/PraiseProvider';
 import { useUserStore } from './store/userStore';
 import { useSocialShare } from './hooks/useSocialShare';
 import { supabase } from './lib/supabase';
@@ -54,124 +58,136 @@ function App() {
   return (
     <HelmetProvider>
       <BrowserRouter>
-        <Routes>
-          {/* Public routes */}
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/pricing" element={<PricingPage />} />
-          <Route path="/share" element={<SharePage />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-          <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
-          <Route path="/checkout/cancel" element={<CheckoutCancelPage />} />
-          <Route path="/auth/callback" element={<AuthCallbackPage />} />
-          
-          {/* Onboarding */}
-          <Route 
-            path="/onboarding" 
-            element={
-              isAuthenticated ? <OnboardingPage /> : <Navigate to="/login" replace />
-            } 
-          />
-          
-          {/* Protected routes */}
-          <Route 
-            path="/" 
-            element={
-              isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
-            } 
-          />
-          <Route 
-            path="/library" 
-            element={
-              <ProtectedRoute requiredPermission="read:all">
-                <LibraryPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/reading/:bookId" 
-            element={
-              <ProtectedRoute requiredPermission="read:all">
-                <ReadingPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/analytics" 
-            element={
-              <ProtectedRoute requiredPermission="read:all">
-                <AnalyticsPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/productivity" 
-            element={
-              <ProtectedRoute requiredPermission="read:all">
-                <ProductivityHabitsPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/streaks" 
-            element={
-              <ProtectedRoute requiredPermission="read:all">
-                <GamificationPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/club/:clubId" 
-            element={
-              <ProtectedRoute requiredPermission="join:clubs">
-                <BookClubPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/voice-settings" 
-            element={
-              <ProtectedRoute requiredPermission="use:voice">
-                <VoiceSettingsPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/praise-customizer" 
-            element={
-              <ProtectedRoute requiredPermission="use:voice">
-                <PraiseCustomizerPage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/profile" 
-            element={
-              <ProtectedRoute>
-                <ProfilePage />
-              </ProtectedRoute>
-            } 
-          />
-          <Route 
-            path="/settings" 
-            element={
-              <ProtectedRoute>
-                <SettingsPage />
-              </ProtectedRoute>
-            } 
-          />
-          
-          {/* Fallback route */}
-          <Route path="*" element={<Navigate to={isAuthenticated ? "/" : "/login"} replace />} />
-        </Routes>
+        <PraiseProvider showNotifications={true} notificationPosition="top-right">
+          <Routes>
+            {/* Public routes */}
+            <Route path="/" element={<LandingPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/pricing" element={<PricingPage />} />
+            <Route path="/share" element={<SharePage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/checkout/success" element={<CheckoutSuccessPage />} />
+            <Route path="/checkout/cancel" element={<CheckoutCancelPage />} />
+            <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            
+            {/* Onboarding */}
+            <Route 
+              path="/onboarding" 
+              element={
+                isAuthenticated ? <OnboardingPage /> : <Navigate to="/login" replace />
+              } 
+            />
+            
+            {/* Protected routes */}
+            <Route 
+              path="/dashboard" 
+              element={
+                isAuthenticated ? <HomePage /> : <Navigate to="/login" replace />
+              } 
+            />
+            <Route 
+              path="/library" 
+              element={
+                <ProtectedRoute requiredPermission="read:all">
+                  <LibraryPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/reading/:bookId" 
+              element={
+                <ProtectedRoute requiredPermission="read:all">
+                  <ReadingPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/analytics" 
+              element={
+                <ProtectedRoute requiredPermission="read:all">
+                  <AnalyticsPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/productivity" 
+              element={
+                <ProtectedRoute requiredPermission="read:all">
+                  <ProductivityHabitsPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/streaks" 
+              element={
+                <ProtectedRoute requiredPermission="read:all">
+                  <GamificationPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/club/:clubId" 
+              element={
+                <ProtectedRoute requiredPermission="join:clubs">
+                  <BookClubPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/voice-settings" 
+              element={
+                <ProtectedRoute requiredPermission="use:voice">
+                  <VoiceSettingsPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/praise-customizer" 
+              element={
+                <ProtectedRoute requiredPermission="use:voice">
+                  <PraiseCustomizerPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/praise-library" 
+              element={
+                <ProtectedRoute>
+                  <PraiseLibraryPage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/profile" 
+              element={
+                <ProtectedRoute>
+                  <ProfilePage />
+                </ProtectedRoute>
+              } 
+            />
+            <Route 
+              path="/settings" 
+              element={
+                <ProtectedRoute>
+                  <SettingsPage />
+                </ProtectedRoute>
+              } 
+            />
+            
+            {/* Fallback route */}
+            <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/"} replace />} />
+          </Routes>
 
-        {/* Global Social Share Modal */}
-        {shareContent && (
-          <SocialShareModal
-            isOpen={isShareModalOpen}
-            onClose={closeShareModal}
-            content={shareContent}
-          />
-        )}
+          {/* Global Social Share Modal */}
+          {shareContent && (
+            <SocialShareModal
+              isOpen={isShareModalOpen}
+              onClose={closeShareModal}
+              content={shareContent}
+            />
+          )}
+        </PraiseProvider>
       </BrowserRouter>
     </HelmetProvider>
   );
