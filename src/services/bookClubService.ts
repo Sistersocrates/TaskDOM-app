@@ -56,9 +56,17 @@ export class BookClubService {
   }
 
   static async createBookClub(clubData: CreateBookClubForm): Promise<BookClub> {
+    console.log('BookClubService.createBookClub called with:', clubData);
+    
     const { data: user } = await supabase.auth.getUser();
-    if (!user.user) throw new Error('User not authenticated');
+    console.log('Current user:', user);
+    
+    if (!user.user) {
+      console.error('User not authenticated');
+      throw new Error('User not authenticated');
+    }
 
+    console.log('Attempting to insert book club...');
     const { data, error } = await supabase
       .from('book_clubs')
       .insert({
@@ -68,10 +76,22 @@ export class BookClubService {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      console.error('Supabase error creating book club:', error);
+      throw error;
+    }
+
+    console.log('Book club created successfully:', data);
 
     // Add creator as admin member
-    await this.addMember(data.id, user.user.id, 'admin');
+    console.log('Adding creator as admin member...');
+    try {
+      await this.addMember(data.id, user.user.id, 'admin');
+      console.log('Creator added as admin member successfully');
+    } catch (memberError) {
+      console.error('Error adding creator as member:', memberError);
+      // Don't throw here as the club was created successfully
+    }
 
     return data;
   }

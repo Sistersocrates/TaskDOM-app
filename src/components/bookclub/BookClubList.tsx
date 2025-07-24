@@ -35,12 +35,31 @@ const BookClubList: React.FC<BookClubListProps> = ({ onSelectClub }) => {
 
   const handleCreateClub = async (clubData: any) => {
     try {
+      console.log('Creating book club with data:', clubData);
+      
+      // Validate required fields
+      if (!clubData.name?.trim()) {
+        throw new Error('Club name is required');
+      }
+      
       const newClub = await BookClubService.createBookClub(clubData);
+      console.log('Book club created successfully:', newClub);
+      
       setClubs(prev => [newClub, ...prev]);
       setShowCreateModal(false);
       onSelectClub(newClub);
+      
+      // Show success message (you could add a toast notification here)
+      alert('Book club created successfully!');
+      
     } catch (error) {
       console.error('Error creating club:', error);
+      
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : 'Failed to create book club';
+      alert(`Error: ${errorMessage}`);
+      
+      // Don't close modal on error so user can try again
     }
   };
 
