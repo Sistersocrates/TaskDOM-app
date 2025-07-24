@@ -163,70 +163,137 @@ class GoogleBooksService {
 
   async searchBooks(query: string, maxResults: number = 20): Promise<GoogleBook[]> {
     try {
-      // Check if API key is valid before making requests
+      // Try Google Books first if API key is available
       const isValidKey = await this.checkApiKeyValidity();
-      if (!isValidKey) {
-        console.warn('Google Books API key is missing or invalid. Falling back to Open Library search.');
-        return [];
-      }
+      
+      if (isValidKey) {
+        const params = {
+          q: query,
+          maxResults: maxResults.toString(),
+          printType: 'books',
+          orderBy: 'relevance'
+        };
 
-      const params = {
-        q: query,
-        maxResults: maxResults.toString(),
-        printType: 'books',
-        orderBy: 'relevance'
-      };
+        const url = this.buildUrl('', params);
+        const response = await fetch(url);
 
-      const url = this.buildUrl('', params);
-      const response = await fetch(url);
+        if (response.ok) {
+          const data: GoogleBooksResponse = await response.json();
 
-      if (!response.ok) {
-        if (response.status === 400 || response.status === 403) {
-          console.warn('Google Books API request failed with status:', response.status, 'Likely API key issue');
-          this.isApiKeyValid = false;
-          return [];
+          if (data.items) {
+            // Process books with enhanced cover image fallback
+            const processedBooks = await Promise.all(
+              data.items.map(async (item) => {
+                const isbn = this.getISBN(item.volumeInfo.industryIdentifiers);
+                const author = item.volumeInfo.authors?.join(', ');
+                
+                const preferredImage = await this.getPreferredImageUrl(
+                  item.volumeInfo.imageLinks,
+                  isbn,
+                  item.volumeInfo.title,
+                  author
+                );
+
+                return {
+                  ...item.volumeInfo,
+                  id: item.id,
+                  imageLinks: {
+                    ...item.volumeInfo.imageLinks,
+                    thumbnail: preferredImage,
+                    small: preferredImage,
+                    medium: preferredImage,
+                    large: preferredImage
+                  }
+                };
+              })
+            );
+
+            return processedBooks;
+          }
         }
-        throw new Error(`Google Books API error: ${response.status} ${response.statusText}`);
       }
 
-      const data: GoogleBooksResponse = await response.json();
+      // Fallback to Open Library search if Google Books fails or no API key
+      console.log('Falling back to Open Library search for:', query);
+      return await this.searchBooksViaOpenLibrary(query, maxResults);
 
-      if (!data.items) {
+    } catch (error) {
+      console.error('Error searching books:', error);
+      // Try Open Library as final fallback
+      try {
+        return await this.searchBooksViaOpenLibrary(query, maxResults);
+      } catch (fallbackError) {
+        console.error('Open Library fallback also failed:', fallbackError);
         return [];
       }
+    }
+  }
 
-      // Process books with enhanced cover image fallback
-      const processedBooks = await Promise.all(
-        data.items.map(async (item) => {
-          const isbn = this.getISBN(item.volumeInfo.industryIdentifiers);
-          const author = item.volumeInfo.authors?.join(', ');
+  // New method to search via Open Library and convert to Google Books format
+  private async searchBooksViaOpenLibrary(query: string, maxResults: number = 20): Promise<GoogleBook[]> {
+    try {
+      // Parse query to extract title and author if possible
+      const queryParts = query.toLowerCase().split(' ');
+      const authorKeywords = ['by', 'author:', 'inauthor:'];
+      
+      let title = query;
+      let author = '';
+      
+      // Check if query contains author information
+      for (const keyword of authorKeywords) {
+        if (query.toLowerCase().includes(keyword)) {
+          const parts = query.split(new RegExp(keyword, 'i'));
+          if (parts.length === 2) {
+            title = parts[0].trim();
+            author = parts[1].trim().replace(/['"]/g, '');
+          }
+        }
+      }
+
+      // Search Open Library
+      const openLibraryBooks = await openLibraryService.searchBooks(title, author, maxResults);
+      
+      // Convert Open Library books to Google Books format
+      const convertedBooks = await Promise.all(
+        openLibraryBooks.map(async (olBook, index) => {
+          const isbn = olBook.isbn?.[0] || '';
+          const bookAuthors = olBook.authors?.map(a => a.name) || ['Unknown Author'];
+          const bookTitle = olBook.title || 'Unknown Title';
           
-          const preferredImage = await this.getPreferredImageUrl(
-            item.volumeInfo.imageLinks,
-            isbn,
-            item.volumeInfo.title,
-            author
-          );
-
-          return {
-            ...item.volumeInfo,
-            id: item.id,
-            imageLinks: {
-              ...item.volumeInfo.imageLinks,
-              thumbnail: preferredImage,
-              // Store the enhanced image in multiple sizes for consistency
-              small: preferredImage,
-              medium: preferredImage,
-              large: preferredImage
-            }
+          // Get cover image from Open Library
+          const coverUrl = await openLibraryService.getBestCoverImage(isbn, bookTitle, bookAuthors.join(', '));
+          
+          // Create a Google Books compatible object
+          const googleBook: GoogleBook = {
+            id: olBook.key || `ol_${index}_${Date.now()}`,
+            title: bookTitle,
+            authors: bookAuthors,
+            description: typeof olBook.description === 'string' ? olBook.description : olBook.description?.value,
+            publishedDate: olBook.first_publish_year?.toString(),
+            pageCount: olBook.number_of_pages,
+            categories: olBook.subjects?.slice(0, 5) || [],
+            imageLinks: coverUrl ? {
+              thumbnail: coverUrl,
+              small: coverUrl,
+              medium: coverUrl,
+              large: coverUrl
+            } : undefined,
+            industryIdentifiers: isbn ? [{
+              type: isbn.length === 13 ? 'ISBN_13' : 'ISBN_10',
+              identifier: isbn
+            }] : undefined,
+            language: 'en'
           };
+
+          return googleBook;
         })
       );
 
-      return processedBooks;
+      console.log(`Found ${convertedBooks.length} books from Open Library for query: ${query}`);
+      return convertedBooks;
+
     } catch (error) {
-      console.error('Error searching books:', error);
-      // Return empty array instead of throwing to prevent UI breaks
+      console.error('Error searching Open Library:', error);
       return [];
     }
   }
@@ -413,14 +480,123 @@ class GoogleBooksService {
 
   // Search for books by author
   async searchByAuthor(author: string, maxResults: number = 20): Promise<GoogleBook[]> {
-    const authorQuery = `inauthor:"${author}"`;
-    return this.searchBooks(authorQuery, maxResults);
+    try {
+      // Try Google Books first if API key is available
+      const isValidKey = await this.checkApiKeyValidity();
+      
+      if (isValidKey) {
+        const authorQuery = `inauthor:"${author}"`;
+        const params = {
+          q: authorQuery,
+          maxResults: maxResults.toString(),
+          printType: 'books',
+          orderBy: 'relevance'
+        };
+
+        const url = this.buildUrl('', params);
+        const response = await fetch(url);
+
+        if (response.ok) {
+          const data: GoogleBooksResponse = await response.json();
+
+          if (data.items) {
+            const processedBooks = await Promise.all(
+              data.items.map(async (item) => {
+                const isbn = this.getISBN(item.volumeInfo.industryIdentifiers);
+                const bookAuthor = item.volumeInfo.authors?.join(', ');
+                
+                const preferredImage = await this.getPreferredImageUrl(
+                  item.volumeInfo.imageLinks,
+                  isbn,
+                  item.volumeInfo.title,
+                  bookAuthor
+                );
+
+                return {
+                  ...item.volumeInfo,
+                  id: item.id,
+                  imageLinks: {
+                    ...item.volumeInfo.imageLinks,
+                    thumbnail: preferredImage,
+                    small: preferredImage,
+                    medium: preferredImage,
+                    large: preferredImage
+                  }
+                };
+              })
+            );
+
+            return processedBooks;
+          }
+        }
+      }
+
+      // Fallback to Open Library search by author
+      console.log('Falling back to Open Library search for author:', author);
+      return await this.searchBooksViaOpenLibrary(`author:${author}`, maxResults);
+
+    } catch (error) {
+      console.error('Error searching books by author:', error);
+      // Try Open Library as final fallback
+      try {
+        return await this.searchBooksViaOpenLibrary(`author:${author}`, maxResults);
+      } catch (fallbackError) {
+        console.error('Open Library author search fallback also failed:', fallbackError);
+        return [];
+      }
+    }
   }
 
   // Get popular romance books
   async getPopularRomanceBooks(maxResults: number = 20): Promise<GoogleBook[]> {
-    const popularQuery = 'subject:romance subject:fiction orderBy:newest';
-    return this.searchBooks(popularQuery, maxResults);
+    try {
+      // Try Google Books first if API key is available
+      const isValidKey = await this.checkApiKeyValidity();
+      
+      if (isValidKey) {
+        const popularQuery = 'subject:romance subject:fiction orderBy:newest';
+        const result = await this.searchBooks(popularQuery, maxResults);
+        if (result.length > 0) {
+          return result;
+        }
+      }
+
+      // Fallback to Open Library with popular romance authors and titles
+      console.log('Falling back to Open Library for popular romance books');
+      const popularRomanceQueries = [
+        'Colleen Hoover',
+        'Sarah J. Maas',
+        'Rebecca Yarros',
+        'Ali Hazelwood',
+        'Emily Henry',
+        'romance contemporary',
+        'fantasy romance'
+      ];
+
+      const allBooks: GoogleBook[] = [];
+      const booksPerQuery = Math.ceil(maxResults / popularRomanceQueries.length);
+
+      for (const query of popularRomanceQueries) {
+        try {
+          const books = await this.searchBooksViaOpenLibrary(query, booksPerQuery);
+          allBooks.push(...books);
+          if (allBooks.length >= maxResults) break;
+        } catch (error) {
+          console.error(`Error searching for ${query}:`, error);
+        }
+      }
+
+      // Remove duplicates and limit results
+      const uniqueBooks = allBooks.filter((book, index, self) => 
+        index === self.findIndex(b => b.title === book.title && b.authors?.[0] === book.authors?.[0])
+      );
+
+      return uniqueBooks.slice(0, maxResults);
+
+    } catch (error) {
+      console.error('Error getting popular romance books:', error);
+      return [];
+    }
   }
 
   /**

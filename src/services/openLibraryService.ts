@@ -105,16 +105,27 @@ class OpenLibraryService {
       }
 
       const params = new URLSearchParams({
-        title: title,
         limit: limit.toString(),
         fields: 'key,title,author_name,isbn,cover_i,first_publish_year,number_of_pages_median,subject'
       });
 
-      if (author) {
+      // Handle different query types
+      if (title.toLowerCase().startsWith('author:')) {
+        // Author-specific search
+        const authorName = title.replace(/^author:/i, '').trim();
+        params.append('author', authorName);
+      } else if (author) {
+        // Title and author search
+        params.append('title', title);
         params.append('author', author);
+      } else {
+        // General search - could be title, author, or mixed
+        params.append('q', title);
       }
 
       const url = `${this.baseUrl}/search.json?${params.toString()}`;
+      console.log('Open Library search URL:', url);
+      
       const response = await fetch(url);
 
       if (!response.ok) {
@@ -122,20 +133,22 @@ class OpenLibraryService {
       }
 
       const data: OpenLibrarySearchResponse = await response.json();
+      console.log(`Open Library found ${data.numFound} total results, returning ${data.docs.length}`);
       
       const results = data.docs.map(doc => ({
         key: doc.key,
         title: doc.title,
-        authors: doc.authors,
+        authors: doc.authors?.map(name => ({ name, key: '' })) || [],
         isbn: doc.isbn,
-        covers: doc.covers,
+        covers: doc.covers ? [doc.covers] : undefined,
         first_publish_year: doc.first_publish_year,
         number_of_pages: doc.number_of_pages,
         subjects: doc.subjects
       }));
 
-      // Store in cache
+      // Store in cache for 1 hour
       localStorage.setItem(cacheKey, JSON.stringify(results));
+      setTimeout(() => localStorage.removeItem(cacheKey), 60 * 60 * 1000);
       
       return results;
     } catch (error) {
